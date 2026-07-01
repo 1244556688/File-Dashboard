@@ -1,0 +1,4 @@
+# Handle Gradle wrapper and other jar files as binary
+*.jar binary
+gradlew text eol=lf
+gradlew.bat text eol=crlf
