@@ -1,0 +1,76 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Glowing Cyber Folder Base -->
+    <path
+        android:strokeColor="#00F0FF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#1A00F0FF"
+        android:pathData="M 22,30 
+                  L 42,30 
+                  L 48,37 
+                  L 86,37 
+                  A 3,3 0 0 1 89,40 
+                  L 89,76 
+                  A 3,3 0 0 1 86,79 
+                  L 22,79 
+                  A 3,3 0 0 1 19,76 
+                  L 19,33 
+                  A 3,3 0 0 1 22,30 Z" />
+
+    <!-- AI Neural Network Core Inside Folder -->
+    <!-- Center Node -->
+    <path
+        android:fillColor="#BD00FF"
+        android:pathData="M 54,58 A 5,5 0 1 1 54,48 A 5,5 0 1 1 54,58 Z" />
+
+    <!-- Satellite Nodes -->
+    <path
+        android:fillColor="#39FF14"
+        android:pathData="M 38,46 A 3,3 0 1 1 38,40 A 3,3 0 1 1 38,46 Z" />
+    <path
+        android:fillColor="#39FF14"
+        android:pathData="M 70,46 A 3,3 0 1 1 70,40 A 3,3 0 1 1 70,46 Z" />
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M 38,68 A 3,3 0 1 1 38,62 A 3,3 0 1 1 38,68 Z" />
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M 70,68 A 3,3 0 1 1 70,62 A 3,3 0 1 1 70,68 Z" />
+
+    <!-- Synaptic Connection Lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.8"
+        android:pathData="M 38,43 L 54,53" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.8"
+        android:pathData="M 70,43 L 54,53" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.8"
+        android:pathData="M 38,65 L 54,53" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.8"
+        android:pathData="M 70,65 L 54,53" />
+
+    <!-- Subtle digital accent (hologram rings) -->
+    <path
+        android:strokeColor="#39FF14"
+        android:strokeWidth="1"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.5"
+        android:pathData="M 28,34 L 34,34" />
+
+</vector>

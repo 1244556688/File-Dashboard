@@ -1,0 +1,6 @@
+{
+  "name": "AI File Dashboard",
+  "description": "Intelligent Understanding System for local files with semantic AI categorization, user-feedback learning, and hacker dashboard visualizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
