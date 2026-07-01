@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
+import java.util.ArrayDeque
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -61,63 +62,102 @@ class MainViewModel(private val repository: FileRepository) : ViewModel() {
     }
 
     /**
-     * Scan a directory selected by the user via Storage Access Framework
+     * Scan a directory selected by the user via Storage Access Framework (recursively scans subdirectories)
      */
     fun scanDirectory(context: Context, treeUri: Uri) {
         viewModelScope.launch {
             _isScanning.value = true
             _scanProgress.value = 0
             _scanTotal.value = 0
-            _scanResult.value = "Establishing contact with filesystem..."
+            
+            val isZh = _appLanguage.value == AppLanguage.ZH
+            _scanResult.value = if (isZh) "正在連結檔案系統並探索目錄結構..." else "Establishing contact with filesystem and discovering directories..."
 
             try {
                 val resolver = context.contentResolver
-                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                    treeUri,
-                    DocumentsContract.getTreeDocumentId(treeUri)
-                )
-
                 val fileList = mutableListOf<ScannedFileInfo>()
-                resolver.query(
-                    childrenUri,
-                    arrayOf(
-                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                        DocumentsContract.Document.COLUMN_MIME_TYPE,
-                        DocumentsContract.Document.COLUMN_SIZE,
-                        DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-                        DocumentsContract.Document.COLUMN_DOCUMENT_ID
-                    ),
-                    null,
-                    null,
-                    null
-                )?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                    val mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                    val sizeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
-                    val modIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                    val idIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                
+                // BFS Queue to scan subdirectories recursively
+                // Pair: First = document ID, Second = relative path prefix
+                val queue = ArrayDeque<Pair<String, String>>()
+                val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
+                queue.add(Pair(rootDocId, ""))
 
-                    while (cursor.moveToNext()) {
-                        val name = cursor.getString(nameIndex) ?: "unknown"
-                        val mime = cursor.getString(mimeIndex)
-                        val size = cursor.getLong(sizeIndex)
-                        val mod = cursor.getLong(modIndex)
-                        val docId = cursor.getString(idIndex)
+                var dirsScanned = 0
+                val maxDirs = 200 // Prevent scanning infinite levels or huge number of dirs
+                val maxFiles = 300 // Set a healthy limit for the dashboard files count to analyze
 
-                        // Recreate a pseudo-path
-                        val path = "saf://${treeUri.host}/${DocumentsContract.getTreeDocumentId(treeUri)}/$docId"
-                        fileList.add(ScannedFileInfo(name, path, size, mime, mod))
+                while (!queue.isEmpty() && fileList.size < maxFiles && dirsScanned < maxDirs) {
+                    val pair = queue.poll() ?: break
+                    val currentDocId = pair.first
+                    val parentPath = pair.second
+                    dirsScanned++
+
+                    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                        treeUri,
+                        currentDocId
+                    )
+
+                    resolver.query(
+                        childrenUri,
+                        arrayOf(
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                            DocumentsContract.Document.COLUMN_MIME_TYPE,
+                            DocumentsContract.Document.COLUMN_SIZE,
+                            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                            DocumentsContract.Document.COLUMN_DOCUMENT_ID
+                        ),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                        val mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                        val sizeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
+                        val modIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                        val idIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+
+                        while (cursor.moveToNext() && fileList.size < maxFiles) {
+                            val name = cursor.getString(nameIndex) ?: "unknown"
+                            val mime = cursor.getString(mimeIndex)
+                            val size = cursor.getLong(sizeIndex)
+                            val mod = cursor.getLong(modIndex)
+                            val docId = cursor.getString(idIndex)
+
+                            if (mime == "vnd.android.document/directory" || mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                val nextPath = if (parentPath.isEmpty()) name else "$parentPath/$name"
+                                queue.add(Pair(docId, nextPath))
+                            } else {
+                                val displayRelativePath = if (parentPath.isEmpty()) name else "$parentPath/$name"
+                                val displayPrefix = DocumentsContract.getTreeDocumentId(treeUri).substringAfter(':')
+                                val path = if (displayPrefix.isNotEmpty() && displayPrefix != "primary" && displayPrefix != "raw") {
+                                    "/$displayPrefix/$displayRelativePath"
+                                } else {
+                                    "/$displayRelativePath"
+                                }
+                                fileList.add(ScannedFileInfo(name, path, size, mime, mod))
+                            }
+                        }
+                    }
+                    
+                    // Update progress dynamically during discovery
+                    if (fileList.size > 0 && fileList.size % 10 == 0) {
+                        _scanResult.value = if (isZh) {
+                            "已探索到 ${fileList.size} 個檔案..."
+                        } else {
+                            "Discovered ${fileList.size} files..."
+                        }
                     }
                 }
 
                 if (fileList.isEmpty()) {
-                    _scanResult.value = "No files found in specified sector."
+                    _scanResult.value = if (isZh) "在指定的磁區中未找到任何檔案。" else "No files found in specified sector."
                     _isScanning.value = false
                     return@launch
                 }
 
                 _scanTotal.value = fileList.size
-                _scanResult.value = "Analyzing file signatures..."
+                _scanResult.value = if (isZh) "正在分析檔案特徵與智慧分類中..." else "Analyzing file signatures and classifying..."
 
                 // Fetch latest rules for matching
                 val currentRules = repository.allRules.first()
@@ -126,7 +166,11 @@ class MainViewModel(private val repository: FileRepository) : ViewModel() {
 
                 for ((index, fileInfo) in fileList.withIndex()) {
                     _scanProgress.value = index + 1
-                    _scanResult.value = "Processing [${index + 1}/${fileList.size}]: ${fileInfo.name}"
+                    _scanResult.value = if (isZh) {
+                        "分析中 [${index + 1}/${fileList.size}]: ${fileInfo.name}"
+                    } else {
+                        "Processing [${index + 1}/${fileList.size}]: ${fileInfo.name}"
+                    }
 
                     // 1. Check user-defined rule match
                     val matchedRule = matchRules(fileInfo.name, fileInfo.path, currentRules)
@@ -172,11 +216,15 @@ class MainViewModel(private val repository: FileRepository) : ViewModel() {
 
                 // Batch save to Room
                 repository.insertFiles(scannedResultList)
-                _scanResult.value = "Scan Complete! Scanned ${fileList.size} files."
+                _scanResult.value = if (isZh) {
+                    "掃描完成！已成功分析並建立 ${fileList.size} 個檔案的智慧索引。"
+                } else {
+                    "Scan Complete! Successfully indexed and classified ${fileList.size} files."
+                }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error scanning sector: ${e.message}", e)
-                _scanResult.value = "Scan Aborted: ${e.message}"
+                _scanResult.value = if (isZh) "掃描中斷: ${e.message}" else "Scan Aborted: ${e.message}"
             } finally {
                 _isScanning.value = false
             }
